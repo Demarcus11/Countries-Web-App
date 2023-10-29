@@ -1,0 +1,242 @@
+---
+// imports 
+import MainLayout from '../layouts/MainLayout.astro';
+
+// data fetching
+
+// Remember the code in the frontmatter is on the server not the client, so when you console.log its in the terminal not the browser
+
+/* 
+
+We don't want to use the data.json file in production, so we'll use the fetch API to get the data from the API. 
+This is because APIs allow you to provide real-time data to your application. When you update your data on the server, 
+it becomes instantly available to clients. With a data.json file, you would need to manually update and redeploy the file to reflect any changes.
+
+API endpoint for all countries: https://restcountries.com/v3.1/all.
+
+*/
+
+// const region = Astro.url.searchParams.get("region").toLowerCase();
+
+// json is an array of objects
+let data = [];
+let error = null;
+
+// response from the API, this will be a true/false
+try {
+	const res = await fetch("https://restcountries.com/v3.1/all");
+	if (!res.ok) {
+		throw new Error("Something went wrong");
+	}
+	// turn the response into JSON, remember turning the response object to JSON format is an asynchronous operation, so we need to use the await keyword
+	data = await res.json();
+}
+catch(err) {
+	console.log(err.message);
+	error = "Something went wrong...";
+}
+
+// Array of regions to use in the select element, we use the spread operator to add all the regions found in the data array to the regions array, then we use the Set object to remove any duplicates, then we turn the Set object back into an array using the spread operator
+const regions = ["All", ...new Set(data.map((country) => country.region))];
+---
+<MainLayout>
+	<main class="mt-10 container mx-auto px-6 font-primary pb-32">
+		<div class="flex flex-col desktop:flex-row desktop:justify-between gap-10">
+			<div class="relative">
+				<svg class="fill-theme-input absolute top-1/2 left-10 -translate-x-1/2 -translate-y-1/2" xmlns="http://www.w3.org/2000/svg" height="1em" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+				<input type="search" id="search" class="rounded-md bg-theme-elements text-theme-input font-semibold w-full desktop:w-96 py-4 pl-16 desktop:pr-8 shadow-[0_0px_5px_0px_rgba(0,0,0,0.2)]" type="text" placeholder="Search for a country..." />
+			</div>
+
+			<select class="bg-theme-elements text-theme-input rounded-md cursor-pointer shadow-[0_0px_5px_0px_rgba(0,0,0,0.2)] p-4 border-r-[16px] border-transparent font-semibold" name="region" id="regions">
+				{regions.map((region) => {
+					return(
+						<option class="font-semibold cursor-pointer" value={region.toLowerCase()}>{region}</option>
+					);
+				})};
+			</select>
+		</div>
+
+		<div class="grid grid-cols-main gap-8 mt-10">
+			{error ? <p class="text-red-500">{error}</p> : null}
+			{data.map((country) => {
+				return (
+				// Create a route for each country, we have to use the country code because some countries have the same name and the API uses the country code to differentiate between them so we can request data for the correct page
+				<a href={`/country/${country.ccn3}`} class="card | text-theme-text bg-theme-elements max-w-xs cursor-pointer hover:-translate-y-3 transition ease-in-out duration-300 rounded-md overflow-hidden shadow-lg" data-region={country.region.toLowerCase()} data-country={country.name.common}>	
+					<div class="h-1/2">
+						<img transition:name={country.flags.png} class="object-cover w-full h-full" src={country.flags.png} alt="" />
+					</div>
+					<div class="p-6">
+						<h2 class="card__name | font-bold text-xl">
+							{country.name.common}
+						</h2>
+
+						<div>
+							<div class="flex items-center gap-2">
+								<p class="font-semibold text-lg">Population:</p>
+								<p class="font-medium text-lg">{country.population.toLocaleString()}</p>
+							</div>
+							<div class="flex items-center gap-2">
+								<p class="font-semibold text-lg">Region:</p>
+								<p class="card__region | font-medium text-lg">{country.region}</p>
+							</div>
+							<div class="flex items-center gap-2">
+								<p class="font-semibold text-lg">Capital:</p>
+								<p class="font-medium text-lg">{country.capital}</p>
+							</div>
+						</div>	
+					</div>
+				</a>
+			)
+			})};
+		</div>
+	</main>
+</MainLayout>	
+
+<!-- Client side script -->
+<script define:vars={{ regions }}>
+
+/*---- Global Variables ----*/
+
+const cards = document.querySelectorAll(".card");
+const searchInput = document.querySelector("#search");
+const regionSelect = document.querySelector("#regions");
+const delay = 500;
+
+const url = new URL(window.location);
+let region = "all";
+
+
+/*---- Functions ----*/
+
+// Function that adds a delay when calling the API
+function debounce(func, delay) {
+	let timeoutId;
+	return function () {
+		const context = this;
+		const args = arguments;
+		clearTimeout(timeoutId);
+		timeoutId = setTimeout(() => {
+			func.apply(context, args);
+		}, delay);
+	};
+}
+
+// Function to set the state of the region filter form the query parameter when the page loads
+function setFilterOnPageLoad() {
+	const url = new URL(window.location);
+	region = url.searchParams.get("region");
+	if (region === null) {
+		region = "all";
+	}
+	else {
+		region = region.toLowerCase();
+	}
+	// when using the .value attribute of a select, its case sensitive, so if it doesn't match a the 'value' attribute for the option in the select it will display blank
+	regionSelect.value = region;
+}
+
+// Function to check if the card is in the selected region by checking if the region value is "all" or if the region of the card matches the selected region
+function isCardInSelectedRegion(region) { // region is the data attribute that has the region of the country
+	const regionValue = regionSelect.value.toLowerCase();
+
+	if (regionValue === "all") {
+		return true;
+	} else {
+		return region === regionValue; // if the region of the card matches the selected region, return true
+	}
+}
+
+// Function to get countries by common name by checking if the country name starts with the typed value and if the user has a filter selected
+function getCountriesByCommonName(searchValue) {
+	cards.forEach((card) => {
+		const cardNames = card.dataset.country.toLowerCase();
+		if (!cardNames.startsWith(searchValue.trim()) || !isCardInSelectedRegion(card.dataset.region.toLowerCase())) {
+			card.classList.add("hidden");
+		}
+		else if (cardNames.startsWith(searchValue.trim()) && isCardInSelectedRegion(card.dataset.region.toLowerCase())) {
+			card.classList.remove("hidden");
+		}
+		else {
+			card.classList.remove("hidden");
+		}
+	});
+}
+
+
+
+/*---- Event Listeners ----*/
+
+// Search functionality
+searchInput.addEventListener("input", debounce((e) => {
+	const searchValue = e.target.value.toLowerCase();
+	getCountriesByCommonName(searchValue);
+}, delay));
+
+// Filter functionality
+regionSelect.addEventListener("change", (e) => {
+	const regionValue = e.target.value.toLowerCase();
+
+	// The URL object needs a base URL (current URL, window.location will give you the current window object that holds the parts of the URL) you're starting with because its used to customize the URL given
+	// window.location and the URL object almost give you the same things, but the URL object gives you more functionality such as searchParams and password
+	const url = new URL(window.location);
+	// We can use the searchParams attribute that has the set method to add a query parameter to the URL, the set method takes two arguments, the name of the query parameter and the value of the query parameter
+	url.searchParams.set("region", regionValue); // the browser lowercases query parameters by default to keep them consistent
+	if (regionValue === "all") {
+		url.searchParams.delete("region");
+	}
+	// (*needed to save query params*) parameters for pushState is (state (the values for the new state for example page_id: 1, user_id: 5, can be left as an empty object if you don't have to touch the values), unused(this is for historical purposes only but needs a value so an empty string is standard), new history entry URL (optional))
+	window.history.pushState({}, "", url);
+	// the history stack is a list of the URLs that a user has visited during a browsing session, we can push a new URL to the history stack using the pushState method
+
+	cards.forEach((card) => {
+		const regionValue = e.target.value.toLowerCase();
+		// if user selects all for region filter and the search is empty, display all cards
+		if (regionValue === "all" && searchInput.value === "") {
+			card.classList.remove("hidden");
+			return;
+		}
+		// if user has something in the search bar and selects a new region, re-fetch the cards in the selected region
+		if (searchInput.value !== "") {
+			const searchValue = searchInput.value.toLowerCase();
+			getCountriesByCommonName(searchValue);
+			return;
+		}
+
+		if (!card.dataset.region.toLowerCase().includes(regionValue)) {
+			card.classList.add("hidden");
+		}
+		else {
+			card.classList.remove("hidden");
+		}
+	});
+});
+
+
+// We want to filter after the DOM content loads because we want to make sure the cards match the filter when the page loads
+
+// Get filter value on page load
+window.addEventListener("DOMContentLoaded", (e) => {
+	setFilterOnPageLoad();
+
+	cards.forEach((card) => {
+		// if user selects all for region filter and the search is empty, display all cards
+		if (region !== null && region.toLowerCase() === "all" && searchInput.value === "") {
+			card.classList.remove("hidden");
+			return;
+		}
+		// if user has something in the search bar and selects a new region, re-fetch the cards in the selected region
+		if (searchInput.value !== "") {
+			const searchValue = searchInput.value.toLowerCase();
+			getCountriesByCommonName(searchValue);
+			return;
+		}
+
+		if (region !== null && !card.dataset.region.toLowerCase().includes(region.toLowerCase())) {
+			card.classList.add("hidden");
+		}
+		else {
+			card.classList.remove("hidden");
+		}
+	});
+});
+</script>

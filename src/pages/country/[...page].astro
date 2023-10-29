@@ -1,0 +1,169 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+
+// page is a special parameter that is available in Astro. It contains the value of the page parameter in the URL. For example, if the URL is https://example.com/?page=US, then page will be US. If the URL is https://example.com/, then page will be undefined.
+const { page } = Astro.params;
+
+// This line sends an HTTP GET request to a URL constructed using the page parameter value. The URL is created by appending the value of page to the base URL https://restcountries.com/v3.1/alpha/. The await keyword is used, indicating that this operation is asynchronous and will pause the code execution until the response is received.
+// When a user clicks on a link to a different page, Astro will automatically update the page parameter in the URL and re-run this code.
+const res = await fetch(`https://restcountries.com/v3.1/alpha/${page}`);
+const data = await res.json();
+
+let countryNames = null;
+let countryNamesData = null;
+// Country names from abbrs
+if ("borders" in data[0]) {
+    countryNames = await fetch(`https://restcountries.com/v3.1/alpha?codes=${data[0].borders.join(',')}`);
+    countryNamesData = await countryNames.json();
+}
+---
+
+<MainLayout>
+    <div class="container mx-auto px-8 grid-container grid-container--details">
+        <button class="back | text-theme-text shadow-[0_0px_10px_0px_rgba(0,0,0,0.3)] flex items-center gap-3 mt-10 mb-16 w-min py-2 px-8">
+            <span>
+                <svg class="fill-theme-text" xmlns="http://www.w3.org/2000/svg" height="1em" viewBox="0 0 448 512"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+            </span>
+            Back
+        </button>
+
+        <div class="uneven-columns">
+            <img class="w-full desktop:h-full" src={`${data[0].flags.png}`} alt={`${data[0].flags.alt}`}>
+            
+            <main class="details__content | desktop:p-4">
+                <h1 class="text-theme-text font-bold text-[clamp(1rem,5vw,1.5rem)]">{data[0].name.common}</h1>
+
+                <ul class="details__list | mt-4 children:flex children:gap-1 children:text-theme-text">
+                    <li>
+                        <h2 class="font-semibold">Native Name:</h2>
+                        <ul class="native-names | flex flex-wrap gap-2">
+                            <li>
+                                <!-- ListFormat takes in an array and turns it into a string -->
+                                {new Intl.ListFormat('en', { style: 'long', type: 'disjunction' }).format(Object.keys(data[0].name.nativeName).map((key) => data[0].name.nativeName[key].common))}
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Population:</h2>
+                        <p>{data[0].population.toLocaleString()}</p>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Region:</h2>
+                        <p>{data[0].region}</p>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Sub Region:</h2>
+                        <p>{data[0].subregion}</p>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Captial:</h2>
+                        <p>{data[0].capital}</p>
+                    </li>
+
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Top Level Domain:</h2>
+                        <p>{data[0].tld}</p>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Currencies:</h2>
+                        <ul class="currencies | flex flex-wrap gap-2">
+                            <li>
+                                {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(Object.keys(data[0].currencies).map((key) => data[0].currencies[key].name))}
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="mt-4">
+                        <h2 class="font-semibold">Languages:</h2>
+                        <ul class="languages | flex flex-wrap gap-2">
+                            <!-- Object.keys extracts the keys (property names) from the array specified (languages), map iterates over the keys and and grabs each language by using it's index, join combines the array values into a string -->
+                            <li>
+                                {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(Object.keys(data[0].languages).map((key) => data[0].languages[key]))}
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                        
+                <div class="mt-6 flex gap-2">
+                    <h2 class="text-theme-text font-semibold">Border Countries:</h2>
+                    <ul class="flex flex-wrap gap-3">
+                        <!-- the borders array from the data object gives you country abbrs which aren't very useful, we need the full country names. We can get them by using the endpoint: https://restcountries.com/v3.1/alpha?codes={country code},{country code},... -->
+                        {countryNames === null ? "None" : countryNamesData.map((country) => {
+                            return (
+                                <li>
+                                    <a class="hover:opacity-70 cursor-pointer shadow-[0_0px_7px_0px_rgba(0,0,0,0.3)] py-1 px-8 bg-theme-elements text-theme-text block" href={`/country/${country.ccn3}`}>{country.name.common}</a>
+                                </li>
+                            )
+                        })}
+                    </ul>
+                </div>
+            </main>
+        </div>
+    </div>
+</MainLayout>
+
+
+<style>
+    body {
+        min-height: 100vh;
+    }
+
+    .grid-container {
+        display: grid;
+        padding-bottom: 10rem;
+        grid-template-areas: 
+        ". back . ."
+        ". content content .";
+    }
+
+    .back {
+        grid-area: back;
+        grid-column: 2 / -1;
+    }
+    .uneven-columns {
+        display: grid;
+        gap: 7rem;
+        grid-area: content;
+    }
+    @media (min-width: 35em) {
+        .uneven-columns {
+            grid-template-columns: repeat(5, 1fr);
+        }
+
+        .uneven-columns > *:first-child {
+            grid-column: 1 / 3;
+        }
+        .uneven-columns > *:last-child {
+            grid-column: 3 / -1;
+        }
+    }
+
+    .details__list {
+        /* column-count divides a containers' children into the specified amount of columns in a balanced fashion while keeping the order */
+        column-count: 1;
+    }
+
+    @media (min-width: 35em) {
+        .details__list {
+            column-count: 2;
+        }
+    }
+</style>
+
+<script>
+const backBtn = document.querySelector('.back');
+
+// history is a built in JS object that contains the browser history.
+backBtn.addEventListener("click", () => history.back());
+
+</script>
+
+<!-- 
+    Object.keys
+    history 
+    query parameters
+    Server Side Rendering
+    Intl.ListFormat
+    tailwind dark/light mode
+    View Transitions: Coding in Public Countries: 2:19:58 and 2:43:48 for view transitions:persists
+
+ -->
